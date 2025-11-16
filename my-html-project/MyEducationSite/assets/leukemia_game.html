@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>다온이의 힐링 모험</title>
+  <style>
+    body {
+      font-family: "Pretendard", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #fef6ff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #game {
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      width: 90%;
+      max-width: 700px;
+      padding: 24px 24px 28px;
+      box-sizing: border-box;
+    }
+
+    .title {
+      font-size: 26px;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      text-align: center;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .scene-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .scene-subtitle {
+      font-size: 14px;
+      color: #777;
+      margin-bottom: 16px;
+    }
+
+    .character {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .dialog-box {
+      background: #fff7ff;
+      border-radius: 16px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #ffd6f5;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+      white-space: nowrap;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 12px rgba(0,0,0,0.12);
+      background: #ffc2ef;
+    }
+
+    button.primary {
+      background: #ff9fd8;
+      font-weight: 600;
+    }
+
+    button.primary:hover {
+      background: #ff89cf;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #ffe7ff;
+      font-size: 11px;
+      color: #aa5fb5;
+      margin-bottom: 10px;
+    }
+
+    .progress {
+      font-size: 12px;
+      color: #999;
+      text-align: right;
+      margin-bottom: 6px;
+    }
+
+    .list {
+      font-size: 14px;
+      margin: 8px 0 4px;
+      padding-left: 18px;
+    }
+
+    .feedback {
+      margin-top: 10px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .feedback.good {
+      color: #2c9a4b;
+    }
+
+    .feedback.bad {
+      color: #d23b3b;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #f2f2ff;
+      font-size: 12px;
+      margin: 2px 4px 0 0;
+    }
+
+    .small-label {
+      font-size: 11px;
+      color: #777;
+      margin-top: 6px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #eee;
+      padding: 4px 3px;
+      text-align: center;
+    }
+
+    th {
+      background: #faf5ff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div class="title">다온이의 힐링 모험</div>
+    <div class="subtitle">백혈병 이해 · 자가관리 · 치료 협조 · 마음 표현 게임</div>
+    <div id="screen"></div>
+  </div>
+
+  <script>
+    const state = {
+      step: 0,
+      scoreUnderstanding: 0,
+      scoreSelfCare: 0,
+      scoreCooperation: 0
+    };
+
+    const STORAGE_KEY = "healingHeroResults";
+
+    /* 🎵 코드로 만드는 게임 배경 멜로디 */
+    let audioCtx = null;
+    let bgmInterval = null;
+    let bgmNoteIndex = 0;
+
+    // 더 흥미진진한 게임 느낌 멜로디 (장난감 게임 BGM 느낌)
+    const MELODY_NOTES = [
+      659.25, 784.0, 880.0, 784.0,  // E5 A5 C6 A5
+      659.25, 587.33, 523.25,       // E5 D5 C5
+      698.46, 784.0, 932.33, 880.0, // F5 A5 Bb5 A5
+      784.0, 659.25, 523.25         // A5 E5 C5
+    ];
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+      }
+    }
+
+    function playOneNote(freq, duration = 0.25) {
+      if (!audioCtx) return;
+      audioCtx.resume();
+      const ctx = audioCtx;
+      const now = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.frequency.value = freq;
+      osc.type = "triangle"; // 조금 더 맑은 게임 느낌
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.18, now + 0.05);
+      gain.gain.linearRampToValueAtTime(0.0, now + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + duration + 0.05);
+    }
+
+    function startBgm() {
+      initAudio();
+      if (!audioCtx) return;
+      if (bgmInterval) return; // 이미 재생 중이면 또 안 켜기
+
+      bgmNoteIndex = 0;
+      bgmInterval = setInterval(() => {
+        const freq = MELODY_NOTES[bgmNoteIndex];
+        playOneNote(freq, 0.25);
+        bgmNoteIndex = (bgmNoteIndex + 1) % MELODY_NOTES.length;
+      }, 320); // 0.32초마다 한 음씩 -> 경쾌한 템포
+    }
+
+    function stopBgm() {
+      if (bgmInterval) {
+        clearInterval(bgmInterval);
+        bgmInterval = null;
+      }
+      if (audioCtx) {
+        audioCtx.suspend();
+      }
+    }
+
+    /* 🔊 칭찬/격려 음성 (더 높은 피치) */
+    function playVoice(text, mode = "normal") {
+      if (!("speechSynthesis" in window)) return;
+
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "ko-KR";
+
+      if (mode === "correct") {
+        utter.pitch = 1.7;   // 더 높은 음역
+        utter.rate = 1.15;   // 살짝 빠르게
+        utter.volume = 1.0;
+      } else if (mode === "wrong") {
+        utter.pitch = 1.3;   // 약간 높고 부드러운 톤
+        utter.rate = 1.0;
+        utter.volume = 1.0;
+      } else {
+        utter.pitch = 1.0;
+        utter.rate = 1.0;
+        utter.volume = 1.0;
+      }
+
+      window.speechSynthesis.speak(utter);
+    }
+
+    function setScreen(html) {
+      document.getElementById("screen").innerHTML = html;
+    }
+
+    function loadResults() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        return [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveResult(result) {
+      const list = loadResults();
+      list.push(result);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
+    function startGame() {
+      state.step = 1;
+      state.scoreUnderstanding = 0;
+      state.scoreSelfCare = 0;
+      state.scoreCooperation = 0;
+
+      // 게임 시작할 때 멜로디 시작
+      startBgm();
+      showIntro();
+    }
+
+    // 0. 첫 화면
+    function showStartScreen() {
+      // 시작 화면에서는 멜로디 끔
+      stopBgm();
+
+      setScreen(`
+        <div class="dialog-box">
+          <div class="character">🌈 다온이</div>
+          <div>
+            "안녕! 나는 백혈병을 치료 중인 다온이야.<br>
+            같이 내 몸을 지켜주는 히어로가 되어 줄래?"
+          </div>
+        </div>
+        <div class="button-row" style="justify-content:center;">
+          <button class="primary" id="startBtn">게임 시작하기</button>
+        </div>
+      `);
+
+      document.getElementById("startBtn").onclick = startGame;
+    }
+
+    // 1단계. 질병 이해 퀴즈
+    function showIntro() {
+      state.step = 1;
+      setScreen(`
+        <div class="progress">1 / 4단계 · 질병 이해</div>
+        <div class="scene-title">몸 속 피 공장을 지켜라!</div>
+        <div class="scene-subtitle">백혈병이 뭔지, 아주 쉽게 알아보기</div>
+
+        <div class="dialog-box">
+          <div class="character">🧪 다온이</div>
+          <div>
+            "백혈병은 감기처럼 전염되는 병이 아니야.<br>
+            <b>뼈 속 ‘피 공장(골수)’에서 피를 만드는 세포들이 아픈 거야.</b><br><br>
+            그래서 피를 잘 못 만들어서<br>
+            감염, 빈혈, 멍 같은 게 잘 생길 수 있어.<br><br>
+            이건 엄마 아빠 잘못도, 내 잘못도 아니야.<br>
+            그냥 세포들이 아프게 변해서 생기는 병이야."
+          </div>
+        </div>
+
+        <div class="tag">퀴즈</div>
+        <div class="dialog-box">
+          <div><b>Q. 백혈병은 어디에 문제가 생기는 병일까?</b></div>
+          <div class="button-row">
+            <button data-answer="correct" class="option-btn">1) 뼈 속 피 공장(골수)</button>
+            <button data-answer="wrong" class="option-btn">2) 다리뼈만 아픈 병</button>
+            <button data-answer="wrong" class="option-btn">3) 친구에게 쉽게 옮기는 병</button>
+          </div>
+          <div id="feedback" class="feedback"></div>
+          <div class="small-label">
+            * 추가 설명: "친구와 놀아도 백혈병은 옮지 않는다"를 꼭 한 번 더 말해주면 좋아요.
+          </div>
+        </div>
+
+        <div class="button-row" style="justify-content:flex-end; margin-top:16px;">
+          <button id="nextBtn" class="primary" disabled>다음 단계로 ▶</button>
+        </div>
+      `);
+
+      const optionButtons = document.querySelectorAll(".option-btn");
+      const feedback = document.getElementById("feedback");
+      const nextBtn = document.getElementById("nextBtn");
+
+      optionButtons.forEach(btn => {
+        btn.onclick = () => {
+          const isCorrect = btn.getAttribute("data-answer") === "correct";
+          if (isCorrect) {
+            feedback.textContent = "정답이야! 백혈병은 뼈 속 피 공장에서 피를 만드는 세포들이 아픈 병이야.";
+            feedback.className = "feedback good";
+            state.scoreUnderstanding = 1;
+            playVoice("최고야!", "correct");
+          } else {
+            feedback.textContent = "아쉬워! 다시 생각해볼까? ‘피 공장’이 있는 곳을 떠올려봐.";
+            feedback.className = "feedback bad";
+            state.scoreUnderstanding = 0;
+            playVoice("다시 해볼까? 할 수 있어!", "wrong");
+          }
+          nextBtn.disabled = false;
+        };
+      });
+
+      nextBtn.onclick = showHandWashingGame;
+    }
+
+    // 2단계. 손 씻기 순서 게임
+    function showHandWashingGame() {
+      state.step = 2;
+      state.selfCareIndex = 0;
+
+      const steps = [
+        "손바닥과 손바닥을 마주 문질러요",
+        "손등을 문질러요",
+        "손가락 사이를 깨끗이 문질러요",
+        "손가락을 깍지 끼고 문질러요",
+        "엄지손가락을 돌려가며 문질러요",
+        "손톱과 손끝을 문질러요"
+      ];
+
+      state.handSteps = steps;
+      renderHandWashingScene();
+    }
+
+    function renderHandWashingScene(feedbackText = "", feedbackType = "") {
+      const currentStep = state.selfCareIndex || 0;
+      const total = state.handSteps.length;
+
+      const stepText = currentStep < total
+        ? `👉 <b>${currentStep + 1}단계</b>에 맞는 동작을 골라볼까?`
+        : "모든 단계를 끝냈어! 이제 결과를 볼까?";
+
+      const buttonsHtml = state.handSteps.map((t, idx) => {
+        return `<button class="hand-btn" data-index="${idx}">${t}</button>`;
+      }).join("");
+
+      setScreen(`
+        <div class="progress">2 / 4단계 · 자가관리</div>
+        <div class="scene-title">손 씻기 히어로 챌린지</div>
+        <div class="scene-subtitle">감염을 막기 위한 힘! 손 씻기 순서를 맞춰보자</div>
+
+        <div class="dialog-box">
+          <div class="character">🧼 세균 지킴이 히어로</div>
+          <div>
+            "백혈병 치료 중인 친구는 <b>감염에 특히 조심</b>해야 해.<br>
+            그래서 <b>손 씻기</b>가 정말 정말 중요하지!<br><br>
+            아래 동작 중에서 <b>${currentStep + 1}단계</b>에 맞는 걸 골라줘!"
+          </div>
+        </div>
+
+        <div class="dialog-box">
+          <div>${stepText}</div>
+          <div class="button-row">
+            ${buttonsHtml}
+          </div>
+          <div id="hwFeedback" class="feedback ${feedbackType}">
+            ${feedbackText}
+          </div>
+          <div class="small-label">
+            * 실제 교육할 땐 노래나 동작을 같이 해주면 더 좋아요.
+          </div>
+        </div>
+
+        <div class="button-row" style="justify-content:flex-end; margin-top:16px;">
+          <button id="skipBtn">스킵하고 다음으로</button>
+          <button id="nextBtn" class="primary" ${currentStep < state.handSteps.length ? "disabled" : ""}>
+            다음 단계로 ▶
+          </button>
+        </div>
+      `);
+
+      const correctOrder = state.handSteps;
+      const handButtons = document.querySelectorAll(".hand-btn");
+      const feedbackEl = document.getElementById("hwFeedback");
+      const nextBtn = document.getElementById("nextBtn");
+      const skipBtn = document.getElementById("skipBtn");
+
+      if (state.selfCareIndex === undefined) state.selfCareIndex = 0;
+
+      handButtons.forEach(btn => {
+        btn.onclick = () => {
+          if (state.selfCareIndex >= correctOrder.length) return;
+
+          const idx = parseInt(btn.getAttribute("data-index"), 10);
+          const isCorrect = (idx === state.selfCareIndex);
+
+          if (isCorrect) {
+            feedbackEl.textContent = "잘했어! 다음 단계 손 씻기도 해보자!";
+            feedbackEl.className = "feedback good";
+            state.selfCareIndex++;
+
+            btn.style.opacity = 0.4;
+            btn.style.pointerEvents = "none";
+
+            playVoice("최고야!", "correct");
+
+            if (state.selfCareIndex === correctOrder.length) {
+              state.scoreSelfCare = 1;
+              nextBtn.disabled = false;
+            }
+          } else {
+            feedbackEl.textContent = "조금 순서가 달라! 다시 한 번 생각해볼까?";
+            feedbackEl.className = "feedback bad";
+            playVoice("다시 해볼까? 할 수 있어!", "wrong");
+          }
+        };
+      });
+
+      nextBtn.onclick = showTreatmentCoop;
+      skipBtn.onclick = () => {
+        state.scoreSelfCare = 0;
+        showTreatmentCoop();
+      };
+    }
+
+    // 3단계. 치료 협조 상황
+    function showTreatmentCoop() {
+      state.step = 3;
+      state.coopIndex = 0;
+      state.scoreCooperation = 0;
+
+      state.coopScenarios = [
+        {
+          text: "항암치료를 받는 날, 조금 무섭지만 간호사 선생님이 \"궁금한 거 있으면 다 물어봐도 돼\"라고 말해줬어.",
+          options: [
+            { text: "궁금한 걸 물어본다", good: true },
+            { text: "아무 말도 안 하고 속으로만 걱정한다", good: false }
+          ]
+        },
+        {
+          text: "수혈을 받은 다음 날, 몸이 너무 피곤하고 힘이 없어.",
+          options: [
+            { text: "몸 상태를 엄마 아빠나 간호사 선생님에게 말한다", good: true },
+            { text: "그냥 참으면서 말 안 한다", good: false }
+          ]
+        },
+        {
+          text: "열이 나는 것 같고 머리가 띵해.",
+          options: [
+            { text: "바로 엄마 아빠나 간호사에게 이야기한다", good: true },
+            { text: "괜찮겠지 하고 넘어간다", good: false }
+          ]
+        }
+      ];
+
+      renderCoopScene();
+    }
+
+    function renderCoopScene(feedbackText = "", feedbackType = "") {
+      const idx = state.coopIndex;
+      const scenarios = state.coopScenarios;
+
+      if (idx >= scenarios.length) {
+        showEmotionScene();
+        return;
+      }
+
+      const s = scenarios[idx];
+
+      const optionsHtml = s.options.map((o, i) => `
+        <button class="coop-btn" data-index="${i}">${o.text}</button>
+      `).join("");
+
+      setScreen(`
+        <div class="progress">3 / 4단계 · 치료 협조</div>
+        <div class="scene-title">치료 히어로 선택하기</div>
+        <div class="scene-subtitle">어떻게 행동하면 내 몸을 더 잘 지킬 수 있을까?</div>
+
+        <div class="dialog-box">
+          <div class="character">🧑‍⚕️ 간호사 히어로</div>
+          <div>
+            "치료를 잘 따라가려면, <b>몸 상태를 말해주는 용기</b>가 정말 중요해.<br>
+            엄마 아빠나 간호사 선생님은 네 이야기를 듣고 싶어 해.<br>
+            아래 상황에서 너라면 어떻게 할지 골라볼래?"
+          </div>
+        </div>
+
+        <div class="dialog-box">
+          <div><b>상황 ${idx + 1}.</b> ${s.text}</div>
+          <div class="button-row" style="margin-top:10px;">
+            ${optionsHtml}
+          </div>
+          <div id="coopFeedback" class="feedback ${feedbackType}">
+            ${feedbackText}
+          </div>
+        </div>
+
+        <div class="button-row" style="justify-content:flex-end; margin-top:16px;">
+          <button id="skipBtn">스킵하고 다음으로</button>
+        </div>
+      `);
+
+      const coopButtons = document.querySelectorAll(".coop-btn");
+      const feedbackEl = document.getElementById("coopFeedback");
+      const skipBtn = document.getElementById("skipBtn");
+
+      coopButtons.forEach(btn => {
+        btn.onclick = () => {
+          const optionIdx = parseInt(btn.getAttribute("data-index"), 10);
+          const chosen = state.coopScenarios[idx].options[optionIdx];
+
+          if (chosen.good) {
+            feedbackEl.textContent = "너무 잘했어! 몸 상태를 말하는 건 정말 중요한 용기야.";
+            feedbackEl.className = "feedback good";
+            state.scoreCooperation++;
+            playVoice("최고야!", "correct");
+          } else {
+            feedbackEl.textContent = "조금 위험할 수 있어. 아플 땐 꼭 엄마 아빠에게 말해주는 게 좋아!";
+            feedbackEl.className = "feedback bad";
+            playVoice("다시 해볼까? 할 수 있어!", "wrong");
+          }
+
+          coopButtons.forEach(b => b.disabled = true);
+
+          setTimeout(() => {
+            state.coopIndex++;
+            renderCoopScene();
+          }, 900);
+        };
+      });
+
+      skipBtn.onclick = () => {
+        state.coopIndex++;
+        renderCoopScene();
+      };
+    }
+
+    // 4단계. 감정 표현
+    function showEmotionScene() {
+      state.step = 4;
+
+      setScreen(`
+        <div class="progress">4 / 4단계 · 마음 표현</div>
+        <div class="scene-title">오늘 내 마음 색깔은?</div>
+        <div class="scene-subtitle">지금 내 마음을 색깔과 말로 표현해보기</div>
+
+        <div class="dialog-box">
+          <div class="character">💖 다온이</div>
+          <div>
+            "치료를 받다 보면 <b>좋은 날</b>도 있고 <b>힘든 날</b>도 있어.<br>
+            어떤 마음이든 괜찮아. 지금 너의 마음을 색깔로 표현해 줄래?"
+          </div>
+        </div>
+
+        <div class="dialog-box">
+          <div><b>오늘 내 마음은 어떤 색이랑 가장 가까울까?</b></div>
+          <div class="button-row" style="margin-top:10px;">
+            <button class="emotion-btn" data-color="pink">핑크색 (따뜻하고 포근해요)</button>
+            <button class="emotion-btn" data-color="blue">파란색 (조용하고 살짝 걱정돼요)</button>
+            <button class="emotion-btn" data-color="yellow">노란색 (기대되고 신나요)</button>
+            <button class="emotion-btn" data-color="gray">회색 (조금 지치고 힘들어요)</button>
+          </div>
+
+          <div style="margin-top:14px; font-size:14px;">
+            마음에 드는 색을 누르고, 아래에 오늘 하고 싶은 말을 적어볼까?
+          </div>
+          <textarea id="emotionText" rows="3" style="width:100%; margin-top:8px; border-radius:12px; border:1px solid #ddd; padding:8px; font-size:14px; box-sizing:border-box;" placeholder="예: 오늘 주사 맞았는데 생각보다 덜 아팠어. 그래도 긴장은 됐어."></textarea>
+
+          <div id="emotionFeedback" class="feedback"></div>
+        </div>
+
+        <div class="button-row" style="justify-content:flex-end; margin-top:16px;">
+          <button id="finishBtn" class="primary">게임 결과 보기</button>
+        </div>
+      `);
+
+      let chosenColor = null;
+      const emotionBtns = document.querySelectorAll(".emotion-btn");
+      const feedbackEl = document.getElementById("emotionFeedback");
+      const finishBtn = document.getElementById("finishBtn");
+
+      emotionBtns.forEach(btn => {
+        btn.onclick = () => {
+          chosenColor = btn.getAttribute("data-color");
+          emotionBtns.forEach(b => b.style.outline = "none");
+          btn.style.outline = "2px solid #ff80d0";
+
+          let message = "";
+          if (chosenColor === "pink") {
+            message = "따뜻한 마음이 느껴져. 이런 마음이 있는 너가 너무 소중해.";
+          } else if (chosenColor === "blue") {
+            message = "걱정되는 마음도 괜찮아. 걱정을 말로 꺼내주는 것만으로도 큰 용기야.";
+          } else if (chosenColor === "yellow") {
+            message = "설레고 기대되는 마음, 분명 좋은 힘이 될 거야!";
+          } else if (chosenColor === "gray") {
+            message = "지치고 힘든 날도 당연히 있어. 그럴 땐 ‘쉬어가는 용기’도 필요해.";
+          }
+          feedbackEl.textContent = message;
+          feedbackEl.className = "feedback good";
+        };
+      });
+
+      finishBtn.onclick = () => {
+        const text = document.getElementById("emotionText").value.trim();
+        showResult(chosenColor, text);
+      };
+    }
+
+    // 결과 화면
+    function showResult(chosenColor, text) {
+      const totalScore =
+        state.scoreUnderstanding +
+        state.scoreSelfCare +
+        state.scoreCooperation;
+
+      let levelText = "";
+      if (totalScore === 3) {
+        levelText = "너는 <b>슈퍼 히어로 레벨</b>이야! 몸도, 마음도, 치료 협조도 최고!";
+      } else if (totalScore === 2) {
+        levelText = "거의 다 왔어! 이미 멋진 히어로고, 앞으로 더 잘할 수 있을 거야.";
+      } else {
+        levelText = "지금부터 하나씩 천천히 배워가면 돼. 이미 시작한 것만으로도 충분히 대단해!";
+      }
+
+      let colorTag = "";
+      if (chosenColor) {
+        const label =
+          chosenColor === "pink" ? "따뜻한 핑크 마음" :
+          chosenColor === "blue" ? "조용한 파랑 마음" :
+          chosenColor === "yellow" ? "반짝이는 노랑 마음" :
+          "살짝 지친 회색 마음";
+        colorTag = `<span class="pill">${label}</span>`;
+      }
+
+      const safeText = text
+        ? text.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        : "";
+
+      const userText = text
+        ? `<div style="margin-top:10px; font-size:13px; color:#555;">
+            👉 네가 적어준 마음 한 문장<br>
+            <i>"${safeText}"</i>
+           </div>`
+        : `<div style="margin-top:10px; font-size:13px; color:#777;">
+            오늘은 말로 쓰기 조금 어렵다면, 다음에 다시 적어봐도 좋아 :)
+           </div>`;
+
+      // 결과 저장하기
+      const now = new Date();
+      const resultObj = {
+        time: now.toLocaleString("ko-KR"),
+        understanding: state.scoreUnderstanding,
+        selfCare: state.scoreSelfCare,
+        cooperation: state.scoreCooperation,
+        total: totalScore
+      };
+      saveResult(resultObj);
+
+      const allResults = loadResults();
+      let recordsHtml = "";
+
+      if (allResults.length > 0) {
+        const rows = allResults.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${r.time}</td>
+            <td>${r.understanding}</td>
+            <td>${r.selfCare}</td>
+            <td>${r.cooperation}</td>
+            <td>${r.total}</td>
+          </tr>
+        `).join("");
+
+        recordsHtml = `
+          <div class="dialog-box">
+            <div class="character">📊 지금까지 플레이 기록</div>
+            <div class="small-label">
+              * 같은 컴퓨터·같은 브라우저에서 한 기록이 쌓여요. (localStorage 사용)
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>시간</th>
+                  <th>질병</th>
+                  <th>손씻기</th>
+                  <th>협조</th>
+                  <th>총점</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      setScreen(`
+        <div class="scene-title">히어로 결과 카드</div>
+        <div class="scene-subtitle">백혈병 친구를 위한 몸·마음 히어로 되기</div>
+
+        <div class="dialog-box">
+          <div class="character">🌟 히어로 평가</div>
+          <div>
+            ${levelText}
+          </div>
+          <div style="margin-top:8px;">
+            <span class="pill">질병 이해: ${state.scoreUnderstanding ? "👍" : "연습 필요"}</span>
+            <span class="pill">손 씻기: ${state.scoreSelfCare ? "👍" : "연습 필요"}</span>
+            <span class="pill">치료 협조: ${state.scoreCooperation ? "👍" : "연습 필요"}</span>
+          </div>
+          <div style="margin-top:8px;">
+            ${colorTag}
+          </div>
+          ${userText}
+        </div>
+
+        <div class="dialog-box">
+          <div class="character">👩‍⚕️ 교육 포인트 (교사용)</div>
+          <ul class="list">
+            <li>백혈병은 “피 공장(골수)” 설명 위주로, 죄책감·전염에 대한 오해 바로잡기</li>
+            <li>손 씻기는 실제 동작·노래와 함께 반복하면 기억에 더 잘 남음</li>
+            <li>몸 상태·감정을 말로 표현하는 연습은 치료 협조에 직접적으로 도움</li>
+            <li>어떤 감정도 “괜찮다”는 메시지를 반복적으로 전달하기</li>
+            <li>점수 기록은 아이 개별 변화·반복 교육 정도를 파악하는 데 활용 가능</li>
+          </ul>
+        </div>
+
+        ${recordsHtml}
+
+        <div class="button-row" style="justify-content:space-between; margin-top:16px;">
+          <button id="restartBtn">다시 해보기</button>
+          <button id="endBtn" class="primary">게임 끝! 수고했어 💖</button>
+        </div>
+      `);
+
+      document.getElementById("restartBtn").onclick = () => {
+        startGame();
+      };
+
+      document.getElementById("endBtn").onclick = () => {
+        showStartScreen(); // 여기서 멜로디도 멈춤
+      };
+    }
+
+    // 처음 실행
+    showStartScreen();
+  </script>
+</body>
+</html>
